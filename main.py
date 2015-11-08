@@ -13,4 +13,4 @@ threads = contents.div.find_all('div', {'class': 'thread'}, recursive=False)
 
 for thread_soup in threads:
     thread = Thread(thread_soup)
-    print(thread.participants())
+    print(Thread.extract_text(thread.messages_text()))
