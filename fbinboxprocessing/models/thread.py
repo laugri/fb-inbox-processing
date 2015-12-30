@@ -2,7 +2,7 @@ import collections
 import nltk
 import operator
 
-from models.message import Message
+from fbinboxprocessing.models.message import Message
 
 
 class Thread(object):

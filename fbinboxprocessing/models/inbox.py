@@ -1,4 +1,4 @@
-from models.thread import Thread
+from fbinboxprocessing.models.thread import Thread
 
 
 class Inbox(object):
