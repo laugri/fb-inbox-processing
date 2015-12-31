@@ -2,38 +2,59 @@ import collections
 import nltk
 import operator
 
-from models.message import Message
+from fbinboxprocessing.models.message import Message
 
 
 class Thread(object):
-    """docstring for Thread"""
     def __init__(self, soup):
         self._soup = soup
         self._messages = None
         self._messages_text = None
         self._messages_meta = None
+        self.participants = self._soup.contents[0].replace("  ", "").replace("\n", "").split(", ")
 
-    @property
-    def participants(self):
-        return self._soup.contents[0].replace("  ", "").replace("\n", "")
+    def __repr__(self):
+        return (
+            "Thread " +
+            str(self.participants)
+        )
 
-    def messages_meta(self, text_only=False):
-        if not self._messages_meta:
-            self._messages_meta = self._soup.find_all(
-                "div",
-                {"class": "message"},
-                recursive=False
-            )
-        return self._messages_meta
+    def incorporate(self, other_threads):
+        """Merges another thread into itself."""
+        for thread in other_threads:
+            self._soup.append(thread._soup)
+        self.clear_private()
+        return None
 
-    def messages_text(self, text_only=False):
-        if not self._messages_text:
-            self._messages_text = self.extract_text(self._soup.find_all("p", recursive=False))
-        return self._messages_text
+    def clear_private(self):
+        self._messages_text = None
+        self._messages_meta = None
+        self._messages = None
+
+    def detailed_record(self):
+        return {
+            "participants": self.participants,
+            "start_date": self.start_date(),
+            "end_date": self.end_date(),
+            "messages": self.total_messages(per_user=True),
+            "duration": self.duration(),
+            "day_attendance": self.attendance("day"),
+            "week_attendance": self.attendance("week"),
+            "most_frequent_words": self.most_frequent_words(top=10),
+        }
+
+    def start_date(self):
+        return min(self.messages(), key=lambda message:message.date).date
+
+    def end_date(self):
+        return max(self.messages(), key=lambda message:message.date).date
+
+    def duration(self):
+        return (self.end_date()-self.start_date()).days
 
     def messages(self, participant=None):
         """Prefer using the more specific and lightweight
-        messages_text and messages_meta method.
+        messages_text and messages_meta method when possible.
         """
         if not self._messages:
             messages = []
@@ -43,6 +64,20 @@ class Thread(object):
                     messages.append(message)
             self._messages = messages
         return self._messages
+
+    def messages_meta(self, text_only=False):
+        if not self._messages_meta:
+            self._messages_meta = self._soup.find_all(
+                "div",
+                {"class": "message"},
+                recursive=True
+            )
+        return self._messages_meta
+
+    def messages_text(self, text_only=False):
+        if not self._messages_text:
+            self._messages_text = self.extract_text(self._soup.find_all("p", recursive=True))
+        return self._messages_text
 
     @staticmethod
     def extract_text(soup_list):
@@ -59,19 +94,11 @@ class Thread(object):
                 counter[user] += 1
         return counter
 
-    def start_date(self):
-        return self.messages()[-1].date
-
-    def end_date(self):
-        return self.messages()[0].date
-
-    def duration(self):
-        return (self.end_date()-self.start_date()).days
-
     def most_frequent_words(self, top=10):
         STOP_WORDS = ["le", "la", "les", "au", "du", "a", "à", "un", "une",
                       "des", "que", "sur", "de", "et", "en"
-                      "the",
+                      "the", "je", "", "pas", "tu", "c'est", "ça", "en", "?",
+                      "mais", "pour", "me", "oui", "!", "ce", "j'ai", "ne", "on"
                       ]
         words = []
         for message_content in self.messages_text():
@@ -86,8 +113,8 @@ class Thread(object):
             It returns a list of dict {ngram, frequency}
             ordered from most frequent to least frequent,
             and limited to elements at least 3-frequent.
+            Gives retarded results for now.
         """
-        # Needs clarity (split in smaller bits)
         ngrams = []
         for message_content in self.messages_text():
             ngrams.extend(nltk.ngrams(message_content.split(), n))

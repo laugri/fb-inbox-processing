@@ -1,4 +1,6 @@
 /data
 __pycache__/
+.eggs/
+fb_inbox_processing.egg-info/
 fbip.sublime-project
 fbip.sublime-workspace
